@@ -1,0 +1,86 @@
+---
+title: "2211LiveDead"
+author: "S. Moreau et H. Salmon"
+date: '2022-11-14'
+output: html_document
+---
+
+```{r}
+rm(list=ls())
+library(readr)
+library(tidyverse)
+library(viridis)
+library(ggrepel)
+library(ggthemes)
+#library(rstatix)
+# Define and set analysis style
+
+theme_ana <- function() {
+  theme_classic() +
+    theme(axis.text = element_text( size = 20, family = "Arial", face = "bold", colour = "black"),
+          axis.title = element_text( size = 20, family = "Arial", face = "bold" ),
+          legend.text = element_text( size = 12, family = "Times") ,
+          legend.title = element_text(size = 12, family = "Arial"),
+          legend.justification = "top",
+          strip.text = element_text(size = 12, family = "Arial" ),
+          title = element_text(size = 19, family = "Arial", face = "bold"),
+          axis.ticks.length = unit(.18, "cm"),
+          axis.ticks = element_line(size = 1),
+          axis.line = element_line(size = 1),
+          plot.title = element_text(hjust = 0.5),
+          panel.spacing = unit(1.5, "lines"),
+          strip.text.x = element_text(size = 17, family = "Arial"),
+          strip.background = element_rect(color = "white")
+          )
+}
+
+theme_set(theme_ana())
+
+
+```
+
+```{r}
+# Define a function to extract the data
+LiveDead_extract <- function(NoiseNG, NoiseNR, NucGreen, NucRed, DIV, Device,n){
+  df  <-  bind_rows(NucGreen %>% mutate(channel = "NucGreen"), NucRed %>% mutate(channel = "NucRed"))
+  df2 <- bind_cols(NucGreen$Mean,NucRed$Mean)
+  df2 = df2 %>% rename(NucGreen = ...1 , NucRed = ...2)
+  NucGreen_noise = NoiseNG$Mean[1]
+  NucRed_noise = NoiseNR$Mean[1]
+  count(df2)
+  Nlive = count(df2 %>% filter(NucGreen < 10000,NucRed > NucRed_noise)) # we arbitrarily define a gate at 10000 for NucGreen
+  Ntot = count(df2 %>% filter(NucRed > NucRed_noise))
+  return (data.frame(Ntot = Ntot, Ratio = Nlive / Ntot, DIV =  DIV, Device =  Device, n = n))
+}
+
+# Collect data
+NoiseNG <- read_csv("LiveDead_Noise_NucGreen.csv")
+NoiseNR <- read_csv("LiveDead_Noise_NucRed.csv")
+NucGreen <- read_csv("LiveDead_NucGreen.csv")
+NucRed <- read_csv("LiveDead_NucRed.csv")
+
+extract_example = LiveDead_extract(NoiseNG, NoiseNR, NucGreen, NucRed, "DIV3", "Flex", 1)
+
+df  <-  bind_rows(NucGreen %>% mutate(channel = "NucGreen"), NucRed %>% mutate(channel = "NucRed"))
+df2 <- bind_cols(NucGreen$Mean,NucRed$Mean)
+df2 = df2 %>% rename(NucGreen = ...1 , NucRed = ...2)
+ 
+
+# Repeat this process for as many conditions and replicates you have 
+
+# Merge all the data frame in one single
+
+extract_global=bind_rows(extract_example)
+
+```
+
+```{r}
+df2 %>% ggplot() + 
+  geom_point(aes(x = NucGreen, y = NucRed), size = 0.5) + 
+  geom_vline(xintercept = 10000) + geom_hline(yintercept = NoiseNR$Mean[1]) 
+  
+df2 %>% ggplot() + 
+  geom_histogram(aes(x = NucGreen), bins = 30)
+
+```
+

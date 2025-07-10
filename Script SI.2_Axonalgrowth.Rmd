@@ -1,0 +1,93 @@
+---
+title: "Script_Axonalgrowth"
+author: "S. Moreau et H. Salmon"
+date: '2022-08-29'
+output: html_document
+---
+
+```{r collect, warning=FALSE, error=FALSE, message=FALSE}
+rm(list=ls())
+library(readr)
+library(tidyverse)
+library(viridis)
+library(ggrepel)
+library(ggthemes)
+library(rstatix)
+# Define and set analysis style
+theme_ana <- function() {
+  theme_classic() +
+    theme(axis.text = element_text( size = 20, family = "Arial", face = "bold", colour = "black"),
+          axis.title = element_text( size = 20, family = "Arial", face = "bold" ),
+          legend.text = element_text( size = 12, family = "Times") ,
+          legend.title = element_text(size = 12, family = "Arial"),
+          legend.justification = "top",
+          strip.text = element_text(size = 12, family = "Arial" ),
+          title = element_text(size = 19, family = "Arial", face = "bold"),
+          axis.ticks.length = unit(.18, "cm"),
+          axis.ticks = element_line(size = 1),
+          axis.line = element_line(size = 1),
+          plot.title = element_text(hjust = 0.5),
+          panel.spacing = unit(1.5, "lines"),
+          strip.text.x = element_text(size = 17, family = "Arial"),
+          strip.background = element_rect(color = "white")
+          )
+}
+theme_set(theme_ana())
+NeuriteJ_import_number <- function(name){
+read_csv(name, 
+    col_types = cols(...1 = col_skip(), Math = col_skip(), 
+        Value = col_skip(), `Body Stat` = col_skip(), 
+        `Body Value` = col_skip()))
+}
+# Collect data
+
+df_test <- NeuriteJ_import_number("AxGrowth.csv")
+
+
+```
+
+```{r tidy}
+NeuriteJ_tidy <- function(df, div, Design, N){
+  df1 = df %>% rename(distance = `Distance (microns)`, intersections = Intersections) %>% mutate(DIV = div, design = Design  , replicate = N) 
+  return(df1)
+}
+
+
+# Tidy data and specify the DIV number, design type and replicate number
+
+df_test_tidy <- NeuriteJ_tidy(df_test, 3, "CTRL", 1)
+
+# wrap up all the data, here we only have one dataframe but this is compatible with as many as required
+
+df_global <- bind_rows(df_test_tidy)
+```
+
+# Plot
+
+```{r plot 1}
+df_global %>% ggplot() + geom_point(aes(x = distance, y = intersections, color = as.character(replicate)))
+ggsave("df_global.png", device = png, dpi = 200, width = 8, height = 4)
+```
+
+```{r plot 2}
+df_global_max <- df_global%>% filter(intersections > 10) %>% group_by(DIV, design, replicate) %>% summarise(distance = last (distance), intersections = last(intersections))
+write_csv(df_global_max,"df_global_max.xls")
+```
+
+```{r plot 3}
+df_temp  = df_global_max %>% summarise(mean = mean(distance), sd = sd(distance) )
+plt= df_temp %>%
+  ggplot( aes( x = design, y= mean, fill= as.character(DIV))) + 
+  geom_bar(stat="identity", color= "black", position= "dodge") +
+  geom_errorbar(aes(ymin=mean - sd, ymax=mean + sd), width=.2,
+                  position=position_dodge(.9))
+
+plt
+
+# in case of 2 groups, the algorithm can perform a statistical test (you need to )
+
+add_pval(plt,  response = 'mean')
+
+
+ggsave("test.png", width = 20, height = 20)
+```
